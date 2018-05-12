@@ -185,13 +185,13 @@ def feat_mat(a_img, b_img, rank=RANK, scale=1):
     vec_deg = vec_deg_li[0]
     vec_scale = vec_scale_li[0]
     print(vec_scale,vec_deg)
-    return tuple(d_v[0], d_v[1]), vec_scale, vec_deg
+    return d_v, vec_scale, vec_deg
 
 # main-code
 
 ## load image
-temp_img = blank_to_zero(temp_imgs['usagi.ppm'])
-back_img = back_imgs['class2_b1_n0_1.ppm']
+temp_img = blank_to_zero(temp_imgs['inu.ppm'])
+back_img = back_imgs['class1_b1_n0_1.ppm']
 t_h, t_w = np.shape(temp_img)[:2]
 b_h, b_w = np.shape(back_img)[:2]
 
