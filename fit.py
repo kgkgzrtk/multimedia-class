@@ -5,7 +5,8 @@ import os
 from scipy import signal,ndimage
 import glob
 
-RANK = 1000
+SCALE = 1
+RANK = 100
 RADIUS = 3
 DIV = 16
 MIN_LOSS = 1000
@@ -87,9 +88,11 @@ def sway(data, d, div=DIV):
         data=data[::-1]
         dd=abs(d)
     else: dd=d
-    d_deg = dd/(360/div)
+    roll_i, rem = divmod(dd,(360/div))
+    data = np.roll(data,-int(roll_i),axis=0)
+    d_deg = rem/(360/div)
     data = np.append(data,[data[0]],axis=0)
-    data = np.array([d_deg*dat+(1-d_deg)*data[i+1] for i,dat in enumerate(data[:-1])])
+    data = np.array([(1-d_deg)*dat+d_deg*data[i+1] for i,dat in enumerate(data[:-1])])
     if d<0 : return data[::-1]
     else : return data
 
@@ -97,12 +100,11 @@ def loss_cal(a,b):
     map(np.array,(a,b))
     if np.sum(b)-np.sum(a)>50: return np.inf, 0
     li = []
-    deg_li = [i for i in range(-20,20+1)]
+    deg_li = [i for i in range(-30,30+1)]
     for i in deg_li:
-        b = sway(b,-i)
-        zero_rate = np.sum(b==0)/b.size
-        b[b==0] = a[b==0]
-        li.append((1-zero_rate)*np.linalg.norm(a-b)) 
+        b_s = sway(b,-i)
+        b_s[b_s==0] = a[b_s==0]
+        li.append(np.linalg.norm(a-b_s)) 
     arg = np.argmin(li)
     return li[arg], deg_li[arg]
 
@@ -181,7 +183,7 @@ def feat_mat(a_img, b_img, rank=RANK, scale=1):
     for v in vec_list[:20]:
         print("[add_vec] loss:%d deg:%f"%(v['loss'],v['deg']),v['a'],v['b'])
     d_vec_li = []; vec_deg_li = []
-    for f_vec in f_vec_li:
+    for f_vec in f_vec_li[:10]:
         va = np.array(f_vec['b']); vb = np.array(f_vec['a'])
         d_vec_li.append(vb-va)
         vec_deg_li.append(f_vec['deg'])
@@ -189,29 +191,31 @@ def feat_mat(a_img, b_img, rank=RANK, scale=1):
     d_vec = npint(np.mean(d_vec_li, axis=0))
     vec_deg = np.int(np.mean(vec_deg_li))
     vec_scale = 1.
-    print(d_vec, vec_scale,vec_deg)
     return d_vec, vec_scale, vec_deg
 
 # main-code
-
 ## load image
-temp_img = blank_to_zero(temp_imgs['reoinu.ppm'])
-back_img = back_imgs['class1_b1_n0_1.ppm']
+temp_name = 'inu.ppm'
+back_name = 'class1_b2_n100_1.ppm'
+
+temp_img = blank_to_zero(temp_imgs[temp_name])
+back_img = np.pad(back_imgs[back_name], [(50,50),(50,50),(0,0)], 'constant')
 t_h, t_w = np.shape(temp_img)[:2]
 b_h, b_w = np.shape(back_img)[:2]
 
 print('temp_size:(%d,%d)'%(t_h,t_w))
-print('image_size:(%d,%d)'%(b_h,b_w))
+print('image_size(pad):(%d,%d)'%(b_h,b_w))
 
 #plt.plot(temp_hist[0])
 
 a_img = temp_img
 b_img = back_img
-trim_img, cen_yx, size = hist_mat(a_img, b_img, 1.)
+trim_img, cen_yx, size = hist_mat(a_img, b_img, scale=SCALE)
 c_y, c_x = cen_yx[0], cen_yx[1]; s_h, s_w = size[0], size[1]
 cv2.imwrite('result/hist_res_img.ppm', trim_img)
 
-move, rescale, redeg = feat_mat(a_img, trim_img, scale=0.8)
+move, rescale, redeg = feat_mat(a_img, trim_img, scale=SCALE)
+print('move:(',move[0],',',move[1],') scale:',rescale,' deg:',redeg)
 c_y -= move[0]
 c_x -= move[1]
 fix_img = b_img[c_y:c_y+s_h, c_x:c_x+s_w]
@@ -222,4 +226,4 @@ fix_img = b_img[c_y:c_y+s_h, c_x:c_x+s_w]
 
 cv2.imwrite('result/feat_res_img.ppm', fix_img)
 
-print(c_y+int(s_h/2),c_x+int(s_w/2))
+print("[finish] matching result : ",c_x+int(s_w/2)-50,c_y+int(s_h/2)-50)
