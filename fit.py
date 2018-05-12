@@ -32,7 +32,6 @@ def blank_to_zero(img):
     img[np.all(img==255, axis=2)]=0
     return img
 
-
 def get_fp(img, rank, rad=RADIUS):
     h, w = img.shape[:2]
     img = conv_rgb(img)
@@ -100,7 +99,7 @@ def loss_cal(a,b):
     map(np.array,(a,b))
     if np.sum(b)-np.sum(a)>50: return np.inf, 0
     li = []
-    deg_li = [i for i in range(-30,30+1)]
+    deg_li = [i for i in range(-30,30+1:2)]
     for i in deg_li:
         b_s = sway(b,-i)
         b_s[b_s==0] = a[b_s==0]
@@ -178,11 +177,12 @@ def feat_mat(a_img, b_img, rank=RANK, scale=1):
     mo = (0,0)
     if len(vec_list)<=2: return (mo, 0, 0)
 
-    f_vec_li = vec_list
     vec_list = sorted(vec_list, key=lambda x:x['loss']) 
+    f_vec_li = vec_list
     for v in vec_list[:20]:
         print("[add_vec] loss:%d deg:%f"%(v['loss'],v['deg']),v['a'],v['b'])
     d_vec_li = []; vec_deg_li = []
+
     for f_vec in f_vec_li[:10]:
         va = np.array(f_vec['b']); vb = np.array(f_vec['a'])
         d_vec_li.append(vb-va)
@@ -195,11 +195,11 @@ def feat_mat(a_img, b_img, rank=RANK, scale=1):
 
 # main-code
 ## load image
-temp_name = 'inu.ppm'
-back_name = 'class1_b2_n100_1.ppm'
+temp_name = 'yuurei.ppm'
+back_name = 'class1_b1_n0_1.ppm'
 
 temp_img = blank_to_zero(temp_imgs[temp_name])
-back_img = np.pad(back_imgs[back_name], [(50,50),(50,50),(0,0)], 'constant')
+back_img = back_imgs[back_name]
 t_h, t_w = np.shape(temp_img)[:2]
 b_h, b_w = np.shape(back_img)[:2]
 
@@ -226,4 +226,4 @@ fix_img = b_img[c_y:c_y+s_h, c_x:c_x+s_w]
 
 cv2.imwrite('result/feat_res_img.ppm', fix_img)
 
-print("[finish] matching result : ",c_x+int(s_w/2)-50,c_y+int(s_h/2)-50)
+print("[finish] matching result : ",c_x+int(s_w/2),c_y+int(s_h/2))
