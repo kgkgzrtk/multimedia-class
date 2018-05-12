@@ -1,18 +1,20 @@
 import numpy as np
 import cv2
+import os
 #import matplotlib.pyplot as plt
 from scipy import signal,ndimage
 import glob
 
-RANK = 500
+RANK = 1000
 RADIUS = 3
-MIN_LOSS = 100
+DIV = 16
+MIN_LOSS = 50
 
 # file read
 temp_files = glob.glob('template/*.ppm')
 back_files = glob.glob('ppm/*.ppm')
-temp_imgs = {t.split('/')[-1]:cv2.imread(t) for t in temp_files}
-back_imgs = {c.split('/')[-1]:cv2.imread(c) for c in back_files}
+temp_imgs = {os.path.basename(t):cv2.imread(t) for t in temp_files}
+back_imgs = {os.path.basename(c):cv2.imread(c) for c in back_files}
 
 # filter
 fil_y = np.array([[1.,2.,1.],[0.,0.,0.],[-1.,-2.,-1.]])
@@ -59,7 +61,7 @@ def fp_writer(arg_list,shape, name='feature_point'):
     return point_img
 
 def make_feat_data(f_map, points, rad=RADIUS, scale=1):
-    div=16; spec=4;
+    div=DIV; spec=4;
     coords = []
     rad*=scale
     for i in range(div):
@@ -80,7 +82,11 @@ def make_feat_data(f_map, points, rad=RADIUS, scale=1):
             point_val[p] = arr
             new_p_li.append(p)
     return point_val, new_p_li
-
+"""
+def sway(data, div=DIV, i):
+    d_deg = i/(360/div)
+    [data[i+1] for i,d in enumerate(data[:-1])]
+"""
 def loss_cal(a,b):
     map(np.array,(a,b))
     if np.sum(b)-np.sum(a)>50: return np.inf, 0
@@ -150,6 +156,7 @@ def feat_mat(a_img, b_img, rank=RANK, scale=1):
                     feat_b_paired.append((y,x,ap[2]))
     
     b_val, feat_b = make_feat_data(b_img, feat_b_paired, scale=scale)
+    print(feat_b)
     cv2.imwrite('result/b_val_img.ppm', np.sum(b_val, axis=3))
 
     min_loss = MIN_LOSS
