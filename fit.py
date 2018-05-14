@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import os
+import sys
 #import matplotlib.pyplot as plt
 from scipy import signal,ndimage
 import glob
@@ -9,7 +10,7 @@ SCALE = 1
 RANK = 100
 RADIUS = 3
 DIV = 16
-MIN_LOSS = 1000
+MIN_LOSS = 100
 
 # file read
 temp_files = glob.glob('template/*.ppm')
@@ -195,8 +196,12 @@ def feat_mat(a_img, b_img, rank=RANK, scale=1):
 
 # main-code
 ## load image
-temp_name = 'neko.ppm'
-back_name = 'class1_b1_n50_2.ppm'
+if(len(sys.argv) != 3):
+    print('Not found 2 filenames:(ex: python3 fit.py inu.ppm class1_b2_n50_1.ppm)')
+    exit()
+
+temp_name = sys.argv[1]
+back_name = sys.argv[2]
 
 temp_img = blank_to_zero(temp_imgs[temp_name])
 back_img = back_imgs[back_name]
@@ -204,13 +209,13 @@ t_h, t_w = np.shape(temp_img)[:2]
 b_h, b_w = np.shape(back_img)[:2]
 
 print('temp_size:(%d,%d)'%(t_h,t_w))
-print('image_size(pad):(%d,%d)'%(b_h,b_w))
+print('image_size:(%d,%d)'%(b_h,b_w))
 
 #plt.plot(temp_hist[0])
 
 a_img = temp_img
 b_img = back_img
-trim_img, cen_yx, size = hist_mat(a_img, b_img, scale=SCALE)
+trim_img, cen_yx, size = hist_mat(a_img, b_img, stride=1, scale=SCALE)
 c_y, c_x = cen_yx[0], cen_yx[1]; s_h, s_w = size[0], size[1]
 cv2.imwrite('result/hist_res_img.ppm', trim_img)
 
