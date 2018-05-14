@@ -99,7 +99,7 @@ def loss_cal(a,b):
     map(np.array,(a,b))
     if np.sum(b)-np.sum(a)>50: return np.inf, 0
     li = []
-    deg_li = [i for i in range(-30,30+1:2)]
+    deg_li = [i for i in range(-30,30+1)]
     for i in deg_li:
         b_s = sway(b,-i)
         b_s[b_s==0] = a[b_s==0]
@@ -195,8 +195,8 @@ def feat_mat(a_img, b_img, rank=RANK, scale=1):
 
 # main-code
 ## load image
-temp_name = 'yuurei.ppm'
-back_name = 'class1_b1_n0_1.ppm'
+temp_name = 'neko.ppm'
+back_name = 'class1_b1_n50_2.ppm'
 
 temp_img = blank_to_zero(temp_imgs[temp_name])
 back_img = back_imgs[back_name]
@@ -218,12 +218,13 @@ move, rescale, redeg = feat_mat(a_img, trim_img, scale=SCALE)
 print('move:(',move[0],',',move[1],') scale:',rescale,' deg:',redeg)
 c_y -= move[0]
 c_x -= move[1]
-fix_img = b_img[c_y:c_y+s_h, c_x:c_x+s_w]
+
+cv2.rectangle(b_img, (c_x,c_y), (c_x+s_w,c_y+s_h), (0,0,255), 2)
+cv2.imwrite('result/res_img.ppm', b_img)
 
 #rotation & resize
 #fix_img = ndimage.rotate(fix_img, np.rad2deg(redeg), reshape=False)
 #res_img = cv2.resize(fix_img, None, fx=rescale, fy=rescale)
 
-cv2.imwrite('result/feat_res_img.ppm', fix_img)
 
 print("[finish] matching result : ",c_x+int(s_w/2),c_y+int(s_h/2))
