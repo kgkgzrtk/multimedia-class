@@ -10,7 +10,7 @@ SCALE = 1
 RANK = 100
 RADIUS = 3
 DIV = 16
-MIN_LOSS = 100
+MIN_LOSS = 300
 
 # file read
 temp_files = glob.glob('template/*.ppm')
@@ -24,11 +24,17 @@ fil_y = np.array([[1.,2.,1.],[0.,0.,0.],[-1.,-2.,-1.]])
 fil_x = fil_y.transpose()
 
 # lambda fanc
-norm = lambda v: v/np.sum(v)
 argmax_2d = lambda x: list(zip(*np.unravel_index(np.argsort(x.ravel())[::-1],x.shape)))
 f_gaus = lambda img: np.dstack(signal.convolve2d(p, fil_gaus, 'same') for p in cv2.split(img))
+rot_xy = lambda r: np.array([[np.cos(r), np.sin(r)],[np.sin(r), np.cos(r)]])
 
 #def fanc
+
+def norm(v):
+    l2 = np.linalg.norm(v, keepdims=True)
+    l2[l2==0] = 1
+    return v/l2
+
 def blank_to_zero(img):
     img[np.all(img==255, axis=2)]=0
     return img
@@ -61,7 +67,7 @@ def fp_writer(arg_list,shape, name='feature_point'):
     return point_img
 
 def make_feat_data(f_map, points, rad=RADIUS, scale=1):
-    div=DIV; spec=10;
+    div=DIV; t=15; n=12;
     coords = []
     rad*=scale
     for i in range(div):
@@ -77,7 +83,12 @@ def make_feat_data(f_map, points, rad=RADIUS, scale=1):
         py, px = p
         if py<rad or px<rad or py+rad>=d0 or px+rad>=d1: continue
         arr = np.array([f_map[py+c[0],px+c[1]] for c in coords])
-        if np.sum(arr>127)>spec:
+        cnt = 0
+        for pix in arr:
+            for i in range(len(arr)):
+                if np.all(pix+t < arr[i]) or np.all(pix-t > arr[i]): cnt+=1
+                else: max_cnt=cnt; cnt=0
+        if max_cnt > n: 
             point_val[p] = arr
             if p not in new_p_li: new_p_li.append(p)
     return point_val, new_p_li
@@ -111,7 +122,7 @@ def loss_cal(a,b):
 
 
 # histgram matching
-def hist_mat(a_img, b_img, scale, stride=10, ocl_param=100):
+def hist_mat(a_img, b_img, scale, stride=1, ocl_param=100):
     # init
     a_hist = hist_rgb(a_img)
     a_h, a_w = np.shape(a_img)[:2]
@@ -125,7 +136,7 @@ def hist_mat(a_img, b_img, scale, stride=10, ocl_param=100):
     for y in range(0,b_h-scale_h,stride):
         for x in range(0,b_w-scale_w,stride):
             trim = b_img[y:y+scale_h,x:x+scale_w]
-            b_hist = hist_rgb(trim)
+            b_hist = hist_rgb(f_gaus(trim))
             score = np.sum(np.minimum(a_hist,b_hist))
             if max_s < score+ocl_param:
                 re_x, re_y = x, y
@@ -182,17 +193,44 @@ def feat_mat(a_img, b_img, rank=RANK, scale=1):
     f_vec_li = vec_list
     for v in vec_list[:20]:
         print("[add_vec] loss:%d deg:%f"%(v['loss'],v['deg']),v['a'],v['b'])
-    d_vec_li = []; vec_deg_li = []
+    
+    min_err = np.inf
+    min_d_v = (0,0)
+    min_deg = 0
+    for i,f_vec in enumerate(f_vec_li):
 
-    for f_vec in f_vec_li[:10]:
         va = np.array(f_vec['b']); vb = np.array(f_vec['a'])
-        d_vec_li.append(vb-va)
-        vec_deg_li.append(f_vec['deg'])
-    npint = np.frompyfunc(int,1,1)
-    d_vec = npint(np.mean(d_vec_li, axis=0))
-    vec_deg = np.int(np.mean(vec_deg_li))
-    vec_scale = 1.
-    return d_vec, vec_scale, vec_deg
+        d_vec = vb-va
+
+        err_list = []
+        scale_list = []
+
+        # E{ norm( a + d_ab - roted_b ) }
+        for j,v in enumerate(f_vec_li):
+            if i==j: continue
+
+            ## V_a -[d_vec]-> V~_b
+            v_tilde = v['a'] + d_vec
+            ## centering -> normalize
+            a_vec = v_tilde - f_vec['b']
+            a_vec_norm = norm(a_vec)
+
+            ## V_b rotation around f_vec['b'] 
+            roted_b_vec = np.dot( rot_xy(np.deg2rad(f_vec['deg'])), v['b']-f_vec['b'] )
+            b_vec_norm = norm(roted_b_vec)
+            
+            ## calc error
+            e = np.sum(np.abs(a_vec_norm - b_vec_norm))
+            s = np.linalg.norm(roted_b_vec) / np.linalg.norm(a_vec)
+
+            ## add err_list
+            err_list.append(e)
+            scale_list.append(s)
+
+        err = np.mean(err_list)
+        if min_err > err : min_err = err; min_d_v = d_vec; min_scale = np.mean(scale_list) ; min_deg = f_vec['deg']
+
+    return min_d_v, min_scale, min_deg 
 
 # main-code
 ## load image
@@ -214,8 +252,11 @@ print('image_size:(%d,%d)'%(b_h,b_w))
 #plt.plot(temp_hist[0])
 
 a_img = temp_img
+cv2.imwrite('result/temp.ppm', a_img)
+
 b_img = back_img
-trim_img, cen_yx, size = hist_mat(a_img, b_img, stride=1, scale=SCALE)
+
+trim_img, cen_yx, size = hist_mat(a_img, b_img, stride=10, scale=SCALE)
 c_y, c_x = cen_yx[0], cen_yx[1]; s_h, s_w = size[0], size[1]
 cv2.imwrite('result/hist_res_img.ppm', trim_img)
 
@@ -224,7 +265,7 @@ print('move:(',move[0],',',move[1],') scale:',rescale,' deg:',redeg)
 c_y -= move[0]
 c_x -= move[1]
 
-cv2.rectangle(b_img, (c_x,c_y), (c_x+s_w,c_y+s_h), (0,0,255), 2)
+cv2.rectangle(b_img, (c_x,c_y), (c_x+t_w,c_y+t_h), (0,0,255), 2)
 cv2.imwrite('result/res_img.ppm', b_img)
 
 #rotation & resize
@@ -232,4 +273,4 @@ cv2.imwrite('result/res_img.ppm', b_img)
 #res_img = cv2.resize(fix_img, None, fx=rescale, fy=rescale)
 
 
-print("[finish] matching result : ",c_x+int(s_w/2),c_y+int(s_h/2))
+print("[finish] matching result : ",c_x+int(t_w/2),c_y+int(t_h/2))
