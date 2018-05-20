@@ -197,8 +197,8 @@ def kp_mat(a_img, b_img, a_ps, b_ps, a_cogs, b_cogs, sigs):
             err = np.linalg.norm(a_vec-b_vec) + 1.-np.sum(np.minimum(b_hist,a_hist))/np.sum(np.maximum(a_hist,b_hist))
             if err<min_err:
                 min_err=err; min_j=j
-                print(err)
         item = {'err':min_err, 'i':i, 'j':min_j}
+        print(min_err)
         match_pair.append(item)
     res_pair = sorted(match_pair, key=lambda x:x['err'])
     return res_pair
